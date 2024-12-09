@@ -10,14 +10,14 @@ struct BTreeNode {
     BTreeNode* parent; // Pointer to the parent node
     bool isLeaf;
 
-    BTreeNode(bool isLeaf, BTreeNode* parent = nullptr) 
+    BTreeNode(bool isLeaf, BTreeNode* parent = nullptr)
         : isLeaf(isLeaf), keys_size(0), parent(parent) {
         for (int i = 0; i <= DEGREE; ++i) children[i] = nullptr;
     }
 
     void insertNonFull(T key);
-    void splitChild(int i, BTreeNode* y);
-    int findChildIndex(BTreeNode<T, DEGREE>* child);
+    T splitChild(int i, BTreeNode* y);
+    void deleteRecursive(BTreeNode* node);
 };
 
 template <typename T, int DEGREE>
@@ -25,9 +25,11 @@ struct BTree {
     BTreeNode<T, DEGREE>* root;
 
     BTree() : root(nullptr) {}
+    ~BTree() { deleteRecursive(root); }
 
     void Insert(T key);
     void Print(string indentation = " ", int level = 0);
+    void deleteRecursive(BTreeNode<T, DEGREE>* node);
 };
 
 template <typename T, int DEGREE>
@@ -68,19 +70,16 @@ void BTreeNode<T, DEGREE>::insertNonFull(T key) {
         // Find the child to insert into
         while (i >= 0 && keys[i] > key) i--;
         i++;
-
-        // If the child is full, split it before inserting
-        if (children[i]->keys_size == DEGREE) {
-            splitChild(i, children[i]);
-            // After splitting, decide which child to proceed with
-            if (keys[i] < key) i++;
-        }
         children[i]->insertNonFull(key);
+        if (children[i]->keys_size == DEGREE) {
+            T mid = this->splitChild(i, children[i]);
+            this->insertNonFull(mid);
+        }
     }
 }
 
 template <typename T, int DEGREE>
-void BTreeNode<T, DEGREE>::splitChild(int i, BTreeNode<T, DEGREE>* child) {
+T BTreeNode<T, DEGREE>::splitChild(int i, BTreeNode<T, DEGREE>* child) {
     BTreeNode<T, DEGREE>* sibling = new BTreeNode<T, DEGREE>(child->isLeaf);
     sibling->keys_size = DEGREE / 2;
 
@@ -101,13 +100,27 @@ void BTreeNode<T, DEGREE>::splitChild(int i, BTreeNode<T, DEGREE>* child) {
         children[j + 1] = children[j];
     children[i + 1] = sibling;
 
-    // Move the middle key to the current node
+    // Insert the middle key into the parent node
     for (int j = keys_size - 1; j >= i; --j)
         keys[j + 1] = keys[j];
     keys[i] = child->keys[DEGREE / 2];
     keys_size++;
+
+    return child->keys[DEGREE / 2];
 }
 
+template <typename T, int DEGREE>
+void BTree<T, DEGREE>::deleteRecursive(BTreeNode<T, DEGREE>* node) {
+    if (node == nullptr) return;
+
+    // Delete all child nodes
+    if (!node->isLeaf) {
+        for (int i = 0; i <= node->keys_size; ++i) {
+            deleteRecursive(node->children[i]);
+        }
+    }
+    delete node; // Free the node memory
+}
 
 template <typename T, int DEGREE>
 void BTree<T, DEGREE>::Print(string indentation, int level) {
@@ -159,7 +172,6 @@ int main() {
     cout << '\n' << '\n';
 
     BTree<char, 5> t1;
-
     t1.Insert('G');
     t1.Insert('I');
     t1.Insert('B');
@@ -179,7 +191,7 @@ int main() {
     t1.Insert('N');
     t1.Insert('P');
     t1.Insert('Q');
-
     t1.Print("", 0);
+
     return 0;
 }
